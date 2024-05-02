@@ -146,7 +146,7 @@ def exportFile(filename, csvDelimiter, includeHeader, quoteOption, query, connec
         EventStatus = "EXPORT"
         logging.debug(f"{EventStatus}: {filename}")
 
-        user_df = pd.read_sql(query, connection)
+        user_df = pd.read_sql(sqlalchemy.text(query), connection)
         logging.info(f"Rows found: {user_df.shape[0]}")
         logging.info(user_df.head())
 
