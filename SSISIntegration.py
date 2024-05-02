@@ -1,3 +1,4 @@
+import argparse
 import logging
 import os
 import pandas as pd
@@ -132,7 +133,7 @@ def unzipFiles(filepath, filename):
         logging.error(f"{EventStatus} at {filename}: {error}")
         logging.debug(f"{EventStatus}")
 
-def exportFile(filename, csvDelimeter, includeHeader, quoteOption, query, connection):
+def exportFile(filename, csvDelimiter, includeHeader, quoteOption, query, connection):
     try:
         EventStatus = "START"
         logging.debug(f"{EventStatus}: {filename}")
@@ -149,8 +150,8 @@ def exportFile(filename, csvDelimeter, includeHeader, quoteOption, query, connec
         logging.info(f"Rows found: {user_df.shape[0]}")
         logging.info(user_df.head())
 
-        user_df.to_csv(path_or_buf=filename, sep=csvDelimeter, header=includeHeader, index=False, mode='w', quoting=quoteOption)
-        logging.info(f"Wrote CSV file '{filename}' with '{csvDelimeter}' delimiter, headers: {includeHeader}")
+        user_df.to_csv(path_or_buf=filename, sep=csvDelimiter, header=includeHeader, index=False, mode='w', quoting=quoteOption)
+        logging.info(f"Wrote CSV file '{filename}' with '{csvDelimiter}' delimiter, headers: {includeHeader}")
 
         execProcedure(connection_ods.engine, "EXEC dbo.usp_EventLogDetail_Insert @EventLogID = ?, @DetailName = ?, @DetailValue = ?;", OUTPUTS_NONE, params=[EventLogIDs[base_filename], base_filename, len(user_df)])
 
@@ -210,13 +211,45 @@ def archiveFile(file : os.PathLike, archive : os.PathLike):
         return None
     
 if __name__ == '__main__':
-    try:
-        importFilesByFilePath(IMPORT_FILES_DIRECTORY, IMPORT_FILES)
+    parser = argparse.ArgumentParser()
+
+    subparsers = parser.add_subparsers(dest='type', required=True)
         
-        exportFile(EXPORT_FILE_PATH, DELIMITER_COMMA, HEADER_SHOW, csv.QUOTE_ALL, SQL_QUERY, connection_ods)
-        
-        copyToUNC(EXPORT_FILE_UNC, EXPORT_FILE_PATH, EXPORT_FILE_DIR)
-        
+
+    parser_import = subparsers.add_parser('Import')
+    parser_export = subparsers.add_parser('Export')
+    
+    parser_import.add_argument('-d, --directory', required=True)
+    parser_import.add_argument("-f", "--files", nargs='+')
+
+    parser_export.add_argument("-e, --export", required=True)
+    parser_export.add_argument("-d", "--delimiter", choices=[',','|','\t'], default=',')
+    parser_export.add_argument("-s", '--show', action='store_true')
+    parser_export.add_argument("-q", "--query", required=True)
+    parser_export.add_argument("-n", "--network")
+
+    main_args = parser.parse_args()
+    print(main_args)
+
+    try: 
+        if main_args.type.casefold() == 'Import'.casefold():
+            IMPORT_FILES_DIRECTORY = main_args.directory
+            if main_args.files:
+                IMPORT_FILES =  main_args.files
+                importFilesByFilePath(IMPORT_FILES_DIRECTORY, IMPORT_FILES)
+            else:
+                importFilesByDirectory(IMPORT_FILES_DIRECTORY)
+        elif main_args.type.casefold() == 'Export'.casefold():
+            EXPORT_FILE_PATH =  main_args.export
+            DELIMITER = main_args.delimiter
+            SHOW_HEADER = main_args.show
+            SQL_QUERY = main_args.query
+            if main_args.network:
+                EXPORT_FILE_UNC = main_args.network
+                copyToUNC(EXPORT_FILE_UNC, EXPORT_FILE_PATH, EXPORT_FILE_DIR)
+            else:
+                exportFile(EXPORT_FILE_PATH, DELIMITER, SHOW_HEADER, csv.QUOTE_ALL, SQL_QUERY, connection_ods)        
         logging.debug("Process completed successfully.")
-    except Exception as error:
+    
+    except:
         logging.error(f"Error occurred: {error}")
