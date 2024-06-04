@@ -1,4 +1,4 @@
-SQL Server Script
+# SSIS2Python-Integration
 
 ## Overview
 The SSIS2Python script is designed to facilitate various database operations, such as importing CSV files into a database, exporting query results to a CSV file, and copying files to a network location. The script leverages SQLAlchemy for database connections, Pandas for data manipulation, and several other Python libraries for file handling and logging.
