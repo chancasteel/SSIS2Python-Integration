@@ -1,4 +1,4 @@
- SQL Server Integration Services Script
+SQL Server Script
 
 ## Overview
 The SSIS2Python script is designed to facilitate various database operations, such as importing CSV files into a database, exporting query results to a CSV file, and copying files to a network location. The script leverages SQLAlchemy for database connections, Pandas for data manipulation, and several other Python libraries for file handling and logging.
@@ -13,7 +13,35 @@ Before running the script, ensure the following:
 - A valid configuration file (`config.ini`) is present in the specified path with appropriate settings.
 
 ## Configuration File
-The `config.ini` file should be located at `J:\SQL DATA\Scripts\Python\SSIS2Python\config.ini`. It should include the necessary configuration settings, particularly the `EventLogIds` section.
+It should include the necessary configuration settings, particularly the `EventLogIds` section. Below is an example of what the `config.ini` file might look like:
+
+### Example `config.ini` File
+
+```ini
+[General]
+Log = Log/SSISIntegration.log
+Server = DISD-SQL
+
+[EventLogIds]
+; Example entries
+file1.csv = 1
+file2.csv = 2
+```
+
+## Reading the Configuration File
+The script reads the configuration file to retrieve the necessary settings. Here is the relevant portion of the script that handles this:
+
+```python
+from configparser import ConfigParser
+
+cf = ConfigParser()
+cf.read('config.ini')
+
+LOG_PATH = cf.get('General', 'Log')
+SQL_SERVER = cf.get('General', 'Server')
+
+EVENT_LOG_IDS = cf.get('EventLogIds')
+```
 
 ## Script Usage
 The script can be executed from the command line with different subcommands for importing, exporting, and copying files. Below are the details of the subcommands and their options.
