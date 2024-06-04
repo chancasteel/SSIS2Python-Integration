@@ -33,7 +33,7 @@ TABLE_NAME = None
 SCHEMA_NAME = None
 
 # Define the log filename based on the current date
-log_filename = f'Log/SSISIntegration_{timestr}.log'
+log_filename = f'Log/ssis2python_integration{timestr}.log'
 
 # Set up the logging configuration
 logging.basicConfig(filename=log_filename, encoding='utf-8', level=logging.DEBUG, format=f'%(asctime)s {EventStatus}: %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p')
@@ -66,26 +66,26 @@ try:
 except Exception as error:
     logging.error(f"ERROR at {EventStatus}: {error}")
 
-def importFilesByDirectory(directory : str):
+def import_files_by_directory(directory : str):
     """Function to import files from a directory 
     * directory - directory to search"""
     try:
         for filename in os.listdir(directory):
-            importFile(directory, filename,type='append')
+            import_file(directory, filename,type='append')
     except OSError as error:
         logging.error(f"Error while listing files in directory {directory}: {error}")
 
-def importFilesByFilePath(filepath, filenames, type=None):
+def import_files_by_path(filepath, filenames, type=None):
     """Function to import specific files from a given directory 
     * filepath - directory to search
     * filenames - filenames to search for in directory"""
     try:
         for file in filenames:
-            importFile(filepath, file)
+            import_file(filepath, file)
     except Exception as error:
         logging.exception(f"Error occurred while importing files: {error}")
 
-def importFile(filepath, filename):
+def import_file(filepath, filename):
     """Function to import a single file 
     * filepath - full path to file directory
     * filename - name of the specific file"""
@@ -95,11 +95,11 @@ def importFile(filepath, filename):
         EventStatus = "STAGE"
         logging.debug(f"{EventStatus} {file}")
         if file.suffix == ".csv":
-            importCSV(file, filename)
+            import_csv(file, filename)
         elif file.suffix == ".zip":
-            unzipFiles(file, filename)
+            unzip_files(file, filename)
 
-def importCSV(filepath, filename):
+def import_csv(filepath, filename):
     """Function to import a CSV file into the database 
     * filepath - full path to csv file
     * filename - name of the specific file"""
@@ -115,12 +115,12 @@ def importCSV(filepath, filename):
         data_df = pd.read_csv(filepath)
 
         EventStatus = "START"
-        EventLogID = execProcedure(connection_stage.engine, "DECLARE @EventLogID int; EXEC dbo.usp_EventLog_Insert @EventType=?, @EventSubtype=?, @EventStatus=?, @EventLogID = @EventLogID OUTPUT; select @EventLogID as EventLogID;", OUTPUTS_REQUIRED, params=['Import',  filename, EventStatus])
+        EventLogID = exec_procedure(connection_stage.engine, "DECLARE @EventLogID int; EXEC dbo.usp_EventLog_Insert @EventType=?, @EventSubtype=?, @EventStatus=?, @EventLogID = @EventLogID OUTPUT; select @EventLogID as EventLogID;", OUTPUTS_REQUIRED, params=['Import',  filename, EventStatus])
         EventLogIDs[filename] =  EventLogID
         update_config_file('EventLogIds', EventLogIDs)
           
         EventStatus = "STAGE"
-        execProcedure(connection_stage.engine, "EXEC dbo.usp_EventLog_Update @EventLogID = ?, @EventStatus = ?;", OUTPUTS_NONE, params=[EventLogIDs[filename], EventStatus])
+        exec_procedure(connection_stage.engine, "EXEC dbo.usp_EventLog_Update @EventLogID = ?, @EventStatus = ?;", OUTPUTS_NONE, params=[EventLogIDs[filename], EventStatus])
         try:
             rowcount = data_df.to_sql(table_name, connection_stage.engine, schema=schema_name.lower(), index=False, if_exists=main_args.exists)
             logging.info(f"{len(data_df)} rows successfully imported to table {schema_name}.{table_name}")
@@ -131,7 +131,7 @@ def importCSV(filepath, filename):
     
     logging.debug("OK")
 
-def unzipFiles(filepath, filename):
+def unzip_files(filepath, filename):
     """Function to unzip files and import them"""
     try:
         EventStatus = "TRANSFORM"
@@ -141,7 +141,7 @@ def unzipFiles(filepath, filename):
             extract_path = os.path.splitext(filepath)[0]
             zObject.extractall(path=extract_path)
         
-        importFilesByDirectory(extract_path)
+        import_files_by_directory(extract_path)
 
         logging.debug(f"{EventStatus}")
     except Exception as error:
@@ -149,7 +149,7 @@ def unzipFiles(filepath, filename):
         logging.error(f"{EventStatus} at {filename}: {error}")
         logging.debug(f"{EventStatus}")
 
-def exportFile(filename, csvDelimiter, includeHeader, quoteOption, query, connection):
+def export_file(filename, csvDelimiter, includeHeader, quoteOption, query, connection):
     """Function to export a query result to a CSV file"""
     try:
         EventStatus = "START"
@@ -157,7 +157,7 @@ def exportFile(filename, csvDelimiter, includeHeader, quoteOption, query, connec
 
         base_filename = os.path.basename(filename)
         if base_filename not in EventLogIDs:
-            EventLogID = execProcedure(connection_ods.engine, "DECLARE @EventLogID int; EXEC dbo.usp_EventLog_Insert @EventType=?, @EventSubtype=?, @EventStatus=?, @EventLogID = @EventLogID OUTPUT; select @EventLogID as EventLogID;", OUTPUTS_REQUIRED, params=['Export', base_filename, EventStatus])
+            EventLogID = exec_procedure(connection_ods.engine, "DECLARE @EventLogID int; EXEC dbo.usp_EventLog_Insert @EventType=?, @EventSubtype=?, @EventStatus=?, @EventLogID = @EventLogID OUTPUT; select @EventLogID as EventLogID;", OUTPUTS_REQUIRED, params=['Export', base_filename, EventStatus])
             EventLogIDs[base_filename] = EventLogID
             update_config_file('EventLogIDs', EventLogIDs)
         
@@ -171,15 +171,15 @@ def exportFile(filename, csvDelimiter, includeHeader, quoteOption, query, connec
         user_df.to_csv(path_or_buf=filename, sep=csvDelimiter, header=includeHeader, index=False, mode='w', quoting=quoteOption)
         logging.info(f"Wrote CSV file '{filename}' with '{csvDelimiter}' delimiter, headers: {includeHeader}")
 
-        execProcedure(connection_ods.engine, "EXEC dbo.usp_EventLogDetail_Insert @EventLogID = ?, @DetailName = ?, @DetailValue = ?;", OUTPUTS_NONE, params=[EventLogIDs[base_filename], base_filename, len(user_df)])
+        exec_procedure(connection_ods.engine, "EXEC dbo.usp_EventLogDetail_Insert @EventLogID = ?, @DetailName = ?, @DetailValue = ?;", OUTPUTS_NONE, params=[EventLogIDs[base_filename], base_filename, len(user_df)])
 
         EventStatus = "OK"
-        execProcedure(connection_ods.engine, "EXEC dbo.usp_EventLog_Update @EventLogID = ?, @EventStatus = ?;", OUTPUTS_NONE, params=[EventLogIDs[base_filename], EventStatus])
+        exec_procedure(connection_ods.engine, "EXEC dbo.usp_EventLog_Update @EventLogID = ?, @EventStatus = ?;", OUTPUTS_NONE, params=[EventLogIDs[base_filename], EventStatus])
     
     except Exception as error:
         logging.error(f"ERROR at {EventStatus}: {error}")
 
-def execProcedure(engine: sqlalchemy.engine.Engine, procedure: str, outputs: bool, params: list = None):
+def exec_procedure(engine: sqlalchemy.engine.Engine, procedure: str, outputs: bool, params: list = None):
     """Function to execute a stored procedure with optional parameters and output 
     * procedure - the name of the stored procedure to execute
     * outputs - whether the execution procedure returns a value
@@ -197,7 +197,7 @@ def execProcedure(engine: sqlalchemy.engine.Engine, procedure: str, outputs: boo
         logging.error(f"ERROR while executing procedure '{procedure}': {error}")
     return results[0] if results else None
 
-def copyToUNC(network: os.PathLike, src: os.PathLike, dest: os.PathLike, user: str = None, password: str = None):
+def copy_to_unc(network: os.PathLike, src: os.PathLike, dest: os.PathLike, user: str = None, password: str = None):
     """Function to copy files to a network location with optional authentication"""
     try:
         if user and password:
@@ -210,7 +210,7 @@ def copyToUNC(network: os.PathLike, src: os.PathLike, dest: os.PathLike, user: s
         logging.error(f"Error copying file: {error}")
         return None
     
-def archiveFile(file : os.PathLike, archive : os.PathLike):
+def archive_file(file : os.PathLike, archive : os.PathLike):
     """Function to archive files by appending the current date to the filename
     * file - the file to archive
     * archive - the path to archive directory or folder"""
@@ -282,9 +282,9 @@ def setup_arg_parser():
 def import_files(directory, files=None):
     """Function to import files based on directory and specific files if provided"""
     if files:
-        importFilesByFilePath(directory, files)
+        import_files_by_path(directory, files)
     else:
-        importFilesByDirectory(directory)
+        import_files_by_directory(directory)
 
 def process_import(args):
     """Function to process the 'Import' command-line option"""
@@ -298,14 +298,14 @@ def process_export(args):
     DELIMITER = args.delimiter
     SHOW_HEADER = args.show
     SQL_QUERY = args.query
-    exportFile(EXPORT_FILE_PATH, DELIMITER, SHOW_HEADER, csv.QUOTE_ALL, SQL_QUERY, connection_ods)
+    export_file(EXPORT_FILE_PATH, DELIMITER, SHOW_HEADER, csv.QUOTE_ALL, SQL_QUERY, connection_ods)
 
 def process_copy(args):
     """Function to process the 'Copy' command-line option"""
     SOURCE_FILE = args.source
     DEST_DIRECTORY = args.destination
     FILE_UNC = args.network
-    copyToUNC(FILE_UNC, SOURCE_FILE, DEST_DIRECTORY)
+    copy_to_unc(FILE_UNC, SOURCE_FILE, DEST_DIRECTORY)
 
 # Main execution entry point
 if __name__ == '__main__':
