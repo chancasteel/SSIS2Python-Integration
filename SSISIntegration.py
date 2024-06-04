@@ -21,7 +21,7 @@ EventStatus = "START"
 
 #Initialize Config File
 config = configparser.ConfigParser()
-config.read('J:\SQL DATA\Scripts\Python\SSIS2Python\config.ini')
+config.read('config.ini')
 EventLogIDs = dict(config.items('EventLogIds'))
 
 
@@ -238,12 +238,12 @@ def update_config_file(section, config_data):
     """
     try:
         config = configparser.ConfigParser()
-        config.read('J:\SQL DATA\Scripts\Python\SSIS2Python\config.ini')
+        config.read('config.ini')
 
         for key, value in config_data.items():
             config.set(section, key, str(value))
 
-        with open('J:\SQL DATA\Scripts\Python\SSIS2Python\config.ini', 'w') as configfile:
+        with open('config.ini', 'w') as configfile:
             config.write(configfile)
     except Exception as error:
         logging.error(f"Error while updating config file section {section} with {config_data}: {error}")
