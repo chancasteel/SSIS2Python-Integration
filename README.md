@@ -20,7 +20,7 @@ It should include the necessary configuration settings, particularly the `EventL
 ```ini
 [General]
 Log = Log/SSISIntegration.log
-Server = DISD-SQL
+Server = MY-SQL
 
 [EventLogIds]
 ; Example entries
